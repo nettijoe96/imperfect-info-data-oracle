@@ -2,51 +2,54 @@ import operator as op
 from functools import reduce
 import math
 
+
+sample_size = None
+updatedPriorsDict = None
+combDict = None
+
+cherryStr = "cherry"
+limeStr = "lime"
+undecidedStr = "undecided"
+
 """
 estimates the majority, minority, and undecided buckets recursively. 
 base case is when you assume that all voters vote
 """
-def estimates(priors, percentCherry, r):
+def estimates(priors, percentCherry, rounds, r):
     majority = 0
     minority = 0
     undecided = 0
     if r == rounds:   # base condition
         for i in range(0, len(priors)):
             myMajority, myMinority, myUndecided = allVotersVoteEstimates(percentCherry[i])
-#            print("in base:", myMajority, myMinority, myUndecided)
             majority += priors[i] * myMajority
             minority += priors[i] * myMinority
             undecided += priors[i] * myUndecided
         if round(majority + minority + undecided, 3) != 1:
             print("sum of estimates not equal to 1:", majority+minority+undecided)
-    #    print(r, ":", majority, minority, undecided)
     else:
         # go through every "world possibility"
         for i in range(0, len(priors)):
-            print("prior", i)
+            #print("prior", i)
             # go through every possible combination of data
-            for cherries in range(0, sampleSize+1):
+            for cherries in range(0, sample_size+1):
                 # update prior for that number of cherries/limes
                 newPriors = updatedPriorsDict[str(cherries)]
                 probCherry = getPi(newPriors, percentCherry)
-#                print("newPriors", newPriors)
-#                print("probCherry", probCherry)
                 # get the estimates for these people
-                myMajority, myMinority, myUndecided = estimates(newPriors, percentCherry, r+1)
-#                print(r, ":", myMajority, myMinority, myUndecided)
+                myMajority, myMinority, myUndecided = estimates(newPriors, percentCherry, rounds, r+1)
                 if profitable(probCherry, myMajority, myMinority):
                     majority += priors[i] * binomial(cherries, priors[i])
                 elif profitable(1-probCherry, myMinority, myMajority):
                     minority += priors[i] * binomial(cherries, priors[i])
                 else:
                     undecided += priors[i] * binomial(cherries, priors[i])
-                #print(r, ":", majority, minority, undecided)
     return majority, minority, undecided
  
 
 
 def binomial(cherries, percentCherry):
-    percent = combDict[str(cherries)] * (percentCherry**cherries) * (1-percentCherry)**(sampleSize-cherries)
+    percent = combDict[str(cherries)] * (percentCherry**cherries) * (1-percentCherry)**(sample_size-cherries)
     return percent
 
 def profitable(prob, majority, minority):
@@ -90,11 +93,11 @@ def allVotersVoteEstimates(percentCherry):
     majority = 0
     minority = 0
     undecided = 0
-    for cherries in range(0, sampleSize+1):
+    for cherries in range(0, sample_size+1):
         percent = binomial(cherries, percentCherry)
-        if cherries < sampleSize/2:
+        if cherries < sample_size/2:
             minority += percent
-        elif cherries > sampleSize/2:
+        elif cherries > sample_size/2:
             majority += percent
         else:
             undecided += percent
@@ -118,32 +121,71 @@ def ncr(n, r):
     return numer / denom
 
 
-initialPriors =    [1/3 for i in range(0, 3)]
-priorsCherryProb = [.25, .5, .75]
-rounds = 2
-sampleSize = 10
-combDict = {}
-for cherries in range(0, sampleSize+1):
-    comb = ncr(sampleSize, cherries)
-    combDict[str(cherries)] = comb
-updatedPriorsDict = {}
-for cherries in range(0, sampleSize+1):
+
+def decide(observedCherries, sampleSize, rounds, initialPriors, priorsCherryProb):
+    global sample_size, updatedPriorsDict, combDict
+    sample_size = sampleSize
+    combDict = makeCombDict(sampleSize)
+    updatedPriorsDict = makeUpdatedPriorsDict(sampleSize, initialPriors, priorsCherryProb)
+    observedLimes = sampleSize-observedCherries
     init = [p for p in initialPriors]
-    updatedPriorsDict[str(cherries)] = updatePriors(cherries, sampleSize-cherries, init, priorsCherryProb)
+    myPriors = updatePriors(observedCherries, observedLimes, init, priorsCherryProb)
+    #printPriors(myPriors, priorsCherryProb)
+    majority, minority, undecided = estimates(myPriors, priorsCherryProb, rounds, 1)
+    probCherry = getPi(myPriors, priorsCherryProb)
+    #print("expectation of cherry", probCherry)
+    #print("majority:", majority, "minority:", minority, "undecided", undecided)
+    if profitable(probCherry, majority, minority):
+        return cherryStr
+    elif profitable(1-probCherry, minority, majority):
+        return limeStr
+    else:
+        return undecidedStr
 
 
-# agents stuff
-observedCherries = 8
-observedLimes= sampleSize-observedCherries
-init = [p for p in initialPriors]
-myPriors = updatePriors(observedCherries, observedLimes, init, priorsCherryProb)
-majority, minority, undecided = estimates(myPriors, priorsCherryProb, 1)
-probCherry = getPi(myPriors, priorsCherryProb)
-print(probCherry)
-print(majority, minority, undecided)
-if profitable(probCherry, majority, minority):
-    print("cherry profitable")
-elif profitable(1-probCherry, minority, majority):
-    print("lime profitable")
-else:
-    print("don't vote")
+def makeUpdatedPriorsDict(sampleSize, initialPriors, priorsCherryProb):
+    updatedPriorsDict = {}
+    for cherries in range(0, sampleSize+1):
+        init = [p for p in initialPriors]
+        updatedPriorsDict[str(cherries)] = updatePriors(cherries, sampleSize-cherries, init, priorsCherryProb)
+    return updatedPriorsDict
+
+
+def makeCombDict(sampleSize):
+    combDict = {}
+    for cherries in range(0, sampleSize+1):
+        comb = ncr(sampleSize, cherries)
+        combDict[str(cherries)] = comb
+    return combDict
+
+
+def printPriors(priors, cherryProb):
+    print("my priors: ", end="")
+    print([round(p, 2) for p in priors])
+
+def experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries):
+    print("number of recursive rounds:", rounds)
+    print("sample size:", sampleSize)
+    print("initial priors mapping: ", end="")
+    print(priorsCherryProb, " --> ", [round(p, 2) for p in initialPriors])
+
+def main():
+    rounds = 2
+    sampleSize = 20
+    observedCherries = 16
+    initialPriors =    [1/5 for i in range(0, 5)]
+    priorsCherryProb = [0, .2, .6, .8, 1]
+    experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries)
+    count = 0
+    for cherries in range(0, sampleSize+1):
+        print(cherries, "observed cherries")
+        isProfitable = decide(cherries, sampleSize, rounds, initialPriors, priorsCherryProb)
+        if isProfitable != undecidedStr:
+            print(cherries, "is profitable")
+            count += 1
+        else:
+            print("not profitable")
+    if count == 0: 
+        print("none are profitable")
+
+main()
