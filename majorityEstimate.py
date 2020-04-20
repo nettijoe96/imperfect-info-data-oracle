@@ -38,12 +38,13 @@ def estimates(priors, percentCherry, rounds, r):
                 probCherry = getPi(newPriors, percentCherry)
                 # get the estimates for these people
                 myMajority, myMinority, myUndecided = estimates(newPriors, percentCherry, rounds, r+1)
-                if profitable(probCherry, myMajority, myMinority):
-                    majority += priors[i] * binomial(cherries, priors[i])
-                elif profitable(1-probCherry, myMinority, myMajority):
-                    minority += priors[i] * binomial(cherries, priors[i])
+                binomialProb = binomial(cherries, priors[i]) # everyone does not consider their own stake in majority estimations
+                if oldProfitable(probCherry, myMajority, myMinority) > 0:
+                    majority += priors[i] * binomialProb
+                elif oldProfitable(1-probCherry, myMinority, myMajority) > 0:
+                    minority += priors[i] * binomialProb
                 else:
-                    undecided += priors[i] * binomial(cherries, priors[i])
+                    undecided += priors[i] * binomialProb
     return majority, minority, undecided
  
 
@@ -52,7 +53,7 @@ def binomial(cherries, percentCherry):
     percent = combDict[str(cherries)] * (percentCherry**cherries) * (1-percentCherry)**(sample_size-cherries)
     return percent
 
-def profitable(prob, majority, minority):
+def oldProfitable(prob, majority, minority):
     if majority == 0:
         return False
     if minority > majority:
@@ -60,7 +61,39 @@ def profitable(prob, majority, minority):
     else:
         gain = prob * (minority/majority)
         loss = 1-prob
-        return gain > loss
+        print(gain-loss)
+        return round(gain > loss, 10)
+
+def oldprofitable(prob, majority, minority):
+    if majority == 0:
+        return False
+    #if minority > majority:
+    #    return False
+    else:
+        gain = majority * (minority/majority)
+        loss = minority
+        return round(gain - loss, 10)
+
+def profitable(prob, majority, minority):
+    if majority == 0:
+        return False
+    if minority > majority:
+        return False
+    else:
+        gain = (minority/majority)
+        loss = 1 
+        print(gain-loss)
+        return round(gain - loss, 10)
+
+def decideProfitable(prob, majority, minority, decisionWeight):
+    if majority == 0:
+        return False
+    #if minority > majority:
+    #    return False
+    else:
+        gain = (minority/(majority+decisionWeight))
+        loss = 1 
+        return round(gain - loss, 10)
 
 def updatePriors(cherries, limes, initialPriors, priorsCherryProb):
     priors = initialPriors
@@ -86,7 +119,6 @@ def getPi(priors, priorsCherryProb):
     for j in range(0, len(priors)):
         prob += priorsCherryProb[j] * priors[j]
     return prob
-
 
 
 def allVotersVoteEstimates(percentCherry):
@@ -122,7 +154,7 @@ def ncr(n, r):
 
 
 
-def decide(observedCherries, sampleSize, rounds, initialPriors, priorsCherryProb):
+def decide(observedCherries, sampleSize, rounds, initialPriors, priorsCherryProb, decisionWeight):
     global sample_size, updatedPriorsDict, combDict
     sample_size = sampleSize
     combDict = makeCombDict(sampleSize)
@@ -135,12 +167,14 @@ def decide(observedCherries, sampleSize, rounds, initialPriors, priorsCherryProb
     probCherry = getPi(myPriors, priorsCherryProb)
     #print("expectation of cherry", probCherry)
     #print("majority:", majority, "minority:", minority, "undecided", undecided)
-    if profitable(probCherry, majority, minority):
-        return cherryStr
-    elif profitable(1-probCherry, minority, majority):
-        return limeStr
+    cherryChoiceProfit = decideProfitable(probCherry, majority, minority, decisionWeight)
+    limeChoiceProfit = decideProfitable(probCherry, majority, minority, decisionWeight)
+    if cherryChoiceProfit > 0:
+        return cherryChoiceProfit, limeChoiceProfit, cherryStr
+    elif limeChoiceProfit > 0:
+        return cherryChoiceProfit, limeChoiceProfit, limeStr
     else:
-        return undecidedStr
+        return cherryChoiceProfit, limeChoiceProfit, undecidedStr
 
 
 def makeUpdatedPriorsDict(sampleSize, initialPriors, priorsCherryProb):
@@ -163,25 +197,27 @@ def printPriors(priors, cherryProb):
     print("my priors: ", end="")
     print([round(p, 2) for p in priors])
 
-def experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries):
+def experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries, decisionWeight):
     print("number of recursive rounds:", rounds)
     print("sample size:", sampleSize)
     print("initial priors mapping: ", end="")
     print(priorsCherryProb, " --> ", [round(p, 2) for p in initialPriors])
+    print("decision weight:", decisionWeight)
 
 def main():
-    rounds = 2
+    rounds = 3
     sampleSize = 20
     observedCherries = 16
     initialPriors =    [1/5 for i in range(0, 5)]
     priorsCherryProb = [0, .2, .6, .8, 1]
-    experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries)
+    decisionWeight = 0
+    experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries, decisionWeight)
     count = 0
     for cherries in range(0, sampleSize+1):
         print(cherries, "observed cherries")
-        isProfitable = decide(cherries, sampleSize, rounds, initialPriors, priorsCherryProb)
-        if isProfitable != undecidedStr:
-            print(cherries, "is profitable")
+        cherryChoiceProfit, limeChoiceProfit, choice = decide(cherries, sampleSize, rounds, initialPriors, priorsCherryProb, decisionWeight)
+        if choice != undecidedStr:
+            print(cherries, "is profitable:", cherryChoiceProfit, limeChoiceProfit)
             count += 1
         else:
             print("not profitable")
