@@ -5,6 +5,7 @@ import copy
 import sys
 
 
+round_decimal_place = 6
 combinations_dict = None
 
 CHERRY = "CHERRY"
@@ -79,39 +80,34 @@ def make_combinations_dict(sampleSize):
     return comb_dict
 
 
-"""
-estimates the majority, minority, and undecided buckets recursively. 
-base case is when you assume that all voters vote
-"""
-def imperfect_algo(observations, sample_size, initial_priors, R, r=0):
-    #print("round:", r)
-    priors = update_priors(observations, sample_size, initial_priors)
-    num_cherry = observations[0] 
-    num_lime = observations[1] 
-    assert(num_cherry + num_lime == sample_size)
 
-    P_C = 0
-    P_L = 0 
-    for h in priors:
-        P_Hi = h.prob
-        P_Ci = h.cherry
-        P_Li = h.lime
-        P_C += P_Ci * P_Hi
-        P_L += P_Li * P_Hi
+def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
+    priors = update_priors(observations, sample_size, initial_priors)
+    P_C = P_L = 0 
 
     if r == R: # base case
-        cherry_prob = 0
-        lime_prob = 0
-        if P_C > P_L: 
-            this_vote = CHERRY
-        elif P_L > P_C: 
-            this_vote = LIME
-        else:
-            this_vote = ABSTAIN
+        M_C = 0
+        M_L = 0
+        for h in priors:
+            P_Hi = h.prob
+            P_Ci = h.cherry
+            P_Li = h.lime
+            if P_Ci > P_Li:
+                M_C += P_Hi
+            elif P_Li > P_Ci:
+                M_L += P_Hi
+        M_L = round(M_L, round_decimal_place)
+        M_C = round(M_C, round_decimal_place)
+        #print("M_L", M_L, "M_C", M_C)
+        if M_C > M_L: this_vote = "cherry"
+        elif M_L > M_C: this_vote = "lime"
+        else: this_vote = "abstain" 
         return this_vote
     else:
-        cherry_sum = 0
-        lime_sum = 0
+        cherry_sum = lime_sum = 0
+        cherry_revenue = lime_revenue = 0
+        cherry_cost = lime_cost = 0
+        cherry_profit = lime_profit = 0
         for h in priors:
             P_Hi = h.prob
             P_Ci = h.cherry
@@ -119,28 +115,25 @@ def imperfect_algo(observations, sample_size, initial_priors, R, r=0):
             for next_cherries in range(0, sample_size+1):
                 next_limes = sample_size - next_cherries
                 next_observations = (next_cherries, next_limes)
-                next_votes = imperfect_algo(next_observations, sample_size, initial_priors, R, r+1)
+                next_vote = imperfect_info_algo(next_observations, sample_size, initial_priors, R, r+1)
                 binomial_prob = binomial(next_cherries, next_limes, P_Ci, P_Li)
                 normalized_binomial_prob = binomial_prob * P_Hi 
-                if next_votes == CHERRY:
-                    cherry_sum += normalized_binomial_prob
-                elif next_votes == LIME:
-                    cherry_sum += normalized_binomial_prob
-                else: pass
-        if cherry_sum != 0: 
-            per_stake_cherry_payout = lime_sum/cherry_sum
-        else: 
-            per_stake_cherry_payout = 0
-        if lime_sum != 0: 
-            per_stake_lime_payout = cherry_sum/lime_sum
-        else: 
-            per_stake_lime_payout = 0
-        print("P_C", P_C)
-        print("P_L", P_L)
-        if (P_C * per_stake_cherry_payout) > P_L: return CHERRY 
-        elif (P_L * per_stake_lime_payout) > P_C: return LIME 
-        else: return ABSTAIN 
-
+                if next_vote == "cherry": cherry_sum += normalized_binomial_prob
+                elif next_vote == "lime": lime_sum += normalized_binomial_prob
+                elif next_vote == "abstain": pass
+            if cherry_sum > lime_sum:
+                cherry_revenue += P_Hi * (lime_sum/cherry_sum)
+                lime_cost += P_Hi
+            elif lime_sum > cherry_sum:
+                lime_revenue += P_Hi * (cherry_sum/lime_sum)
+                cherry_cost += P_Hi
+            cherry_profit = cherry_revenue - cherry_cost
+            lime_profit = lime_revenue - lime_cost
+            if cherry_profit > lime_profit and cherry_profit > 0: this_vote = "cherry"
+            elif lime_profit > lime_profit and lime_profit > 0: this_vote = "lime"
+            else: this_vote = "abstain"
+            return this_vote
+                
 
 def make_hypothesis_list(priors_probs, priors_cherry_probs):
     initial_priors = []
@@ -183,7 +176,7 @@ def main():
         limes = sample_size - cherries
         observations = (cherries,limes)
         experimentHeaderPrint(observations, sample_size, initial_priors, R)
-        vote = imperfect_algo(observations, sample_size, initial_priors, R)
+        vote = imperfect_info_algo(observations, sample_size, initial_priors, R)
         print(vote)
         print()
 
