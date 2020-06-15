@@ -28,6 +28,7 @@ class Hypothesis:
 # uses global combinationsDict object to make calculations faster
 def binomial(cherries, limes, percent_cherry, percent_lime):
     percent = combinations_dict[str(cherries)] * (percent_cherry**cherries) * (percent_lime)**(limes)
+    # print(percent)
     return percent
 
 
@@ -83,7 +84,6 @@ def make_combinations_dict(sampleSize):
 
 def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
     priors = update_priors(observations, sample_size, initial_priors)
-    P_C = P_L = 0 
 
     if r == R: # base case
         M_C = 0
@@ -104,11 +104,10 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
         else: this_vote = "abstain" 
         return this_vote
     else:
-        cherry_sum = lime_sum = 0
         cherry_revenue = lime_revenue = 0
         cherry_cost = lime_cost = 0
-        cherry_profit = lime_profit = 0
         for h in priors:
+            cherry_sum = lime_sum = 0
             P_Hi = h.prob
             P_Ci = h.cherry
             P_Li = h.lime
@@ -127,12 +126,14 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
             elif lime_sum > cherry_sum:
                 lime_revenue += P_Hi * (cherry_sum/lime_sum)
                 cherry_cost += P_Hi
-            cherry_profit = cherry_revenue - cherry_cost
-            lime_profit = lime_revenue - lime_cost
-            if cherry_profit > lime_profit and cherry_profit > 0: this_vote = "cherry"
-            elif lime_profit > lime_profit and lime_profit > 0: this_vote = "lime"
-            else: this_vote = "abstain"
-            return this_vote
+        cherry_profit = cherry_revenue - cherry_cost
+        lime_profit = lime_revenue - lime_cost
+        if r == 0:
+            print("cherry_profit", cherry_profit, "lime_profit", lime_profit)
+        if cherry_profit > lime_profit and cherry_profit > 0: this_vote = "cherry"
+        elif lime_profit > cherry_profit and lime_profit > 0: this_vote = "lime"
+        else: this_vote = "abstain"
+        return this_vote
                 
 
 def make_hypothesis_list(priors_probs, priors_cherry_probs):
@@ -180,30 +181,5 @@ def main():
         print(vote)
         print()
 
-
-
 main()
-
-
-def old_main():
-    global combinations_dict 
-    rounds = 3
-    sample_size = 20
-    combinations_dict = makeCombDict(sample_size)
-    observedCherries = 16
-    initialPriors =    [1/5 for i in range(0, 5)]
-    priorsCherryProb = [0, .2, .6, .8, 1]
-    decisionWeight = 0
-    experimentHeaderPrint(rounds, sampleSize, initialPriors, priorsCherryProb, observedCherries, decisionWeight)
-    count = 0
-    for cherries in range(0, sampleSize+1):
-        print(cherries, "observed cherries")
-        cherryChoiceProfit, limeChoiceProfit, choice = decide(cherries, sampleSize, rounds, initialPriors, priorsCherryProb, decisionWeight)
-        if choice != undecidedStr:
-            print(cherries, "is profitable:", cherryChoiceProfit, limeChoiceProfit)
-            count += 1
-        else:
-            print("not profitable")
-    if count == 0: 
-        print("none are profitable")
 
