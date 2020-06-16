@@ -31,6 +31,49 @@ def binomial(cherries, limes, percent_cherry, percent_lime):
     # print(percent)
     return percent
 
+# https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
+def update_priors_reverse(observations, sample_size, initial_priors):
+    num_cherry = observations[0]
+    num_lime = observations[1]
+    assert(num_cherry + num_lime == sample_size)
+    priors = copy.deepcopy(initial_priors)
+
+    for c in range(0, num_cherry):
+        denom = 0
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Ci = Hi.cherry
+            P_Hi = Hi.prob
+            P_D = P_Ci * P_Hi
+            denom += P_D
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Ci = Hi.cherry
+            P_Hi = Hi.prob
+            num = P_Ci * P_Hi
+            priors[j].prob = num/denom
+        #print(priors[2])
+
+    for l in range(0, num_lime):
+        denom = 0
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Li = Hi.lime
+            P_Hi = Hi.prob
+            P_D = P_Li * P_Hi
+            denom += P_D
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Li = Hi.lime
+            P_Hi = Hi.prob
+            num = P_Li * P_Hi
+            priors[j].prob = num/denom
+        #print(priors[2])
+        
+    for p in priors:
+        p.prob = round(p.prob, round_decimal_place)
+
+    return priors
 
 # https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
 def update_priors(observations, sample_size, initial_priors):
@@ -53,7 +96,7 @@ def update_priors(observations, sample_size, initial_priors):
             P_Hi = Hi.prob
             num = P_Li * P_Hi
             priors[j].prob = num/denom
-        print(priors[2])
+#        print(priors[2])
 
     for c in range(0, num_cherry):
         denom = 0
@@ -69,22 +112,10 @@ def update_priors(observations, sample_size, initial_priors):
             P_Hi = Hi.prob
             num = P_Ci * P_Hi
             priors[j].prob = num/denom
-        print(priors[2])
+#        print(priors[2])
 
-    # for l in range(0, num_lime):
-    #     denom = 0
-    #     for j in range(0, len(priors)):
-    #         Hi = priors[j]
-    #         P_Li = Hi.lime
-    #         P_Hi = Hi.prob
-    #         P_D = P_Li * P_Hi
-    #         denom += P_D
-    #     for j in range(0, len(priors)):
-    #         Hi = priors[j]
-    #         P_Li = Hi.lime
-    #         P_Hi = Hi.prob
-    #         num = P_Li * P_Hi
-    #         priors[j].prob = num/denom
+    for p in priors:
+        p.prob = round(p.prob, round_decimal_place)
 
     return priors
 
@@ -138,8 +169,30 @@ def make_combinations_dict(sampleSize):
 
 
 
+def compare_priors(priors1, priors2):
+    for i in range(0, len(priors1)):
+        p1i = priors1[i] 
+        p2i = priors2[i] 
+        if p1i.prob != p2i.prob:
+            return False
+    return True
+
+
+def print_priors(priors):
+    for p in priors:
+        print(p)
+
+
 def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
-    priors = update_priors(observations, sample_size, initial_priors)
+    priors1 = update_priors(observations, sample_size, initial_priors)
+    priors2 = update_priors_reverse(observations, sample_size, initial_priors)
+    if not compare_priors(priors1, priors2):
+        print("priors1")
+        print_priors(priors1)
+        print("priors2")
+        print_priors(priors2)
+        raise Exception("diff priors")
+    priors = priors1
 
     if r == R:  # base case
         M_C = 0
@@ -185,8 +238,8 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
             elif lime_sum > cherry_sum:
                 lime_revenue += P_Hi * (cherry_sum/lime_sum)
                 cherry_cost += P_Hi
-            print(h, end="")
-            print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost)
+            #print(h, end="")
+            #print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost)
         cherry_profit = cherry_revenue - cherry_cost
         lime_profit = lime_revenue - lime_cost
         # if r == 0:
@@ -254,14 +307,14 @@ def prior_update_test(observations):
     priors_cherry_probs = [0, .25, .5, .75, 1]
     initial_priors = make_hypothesis_list(priors_probs, priors_cherry_probs)
     new_priors = update_priors(observations, sample_size, initial_priors)
-    # new_priors2 = old_update_priors(observations, sample_size, initial_priors)
+    reverse_priors = update_priors_reverse(observations, sample_size, initial_priors)
 
-    print("new algo")
+    print("algo")
     for p in new_priors:
         print(p)
-    # print("old algo")
-    # for p in new_priors2:
-    #     print(p)
+    print("algo reverse")
+    for p in reverse_priors:
+        print(p)
 
 
 def alg_test(observations):
@@ -279,12 +332,13 @@ def alg_test(observations):
 
 
 def tests():
-    # seventhree = (7,3)
-    # threeseven = (3,7)
+    seventhree = (7,3)
+    #threeseven = (3,7)
     fivefive = (5,5)
-    # prior_update_test(seventhree)
-    # prior_update_test(threeseven)
+    sixfour = (6,4)
     prior_update_test(fivefive)
+    #prior_update_test(threeseven)
+    #prior_update_test(fivefive)
 
     # observations = (4,6)
     # print(observations)
@@ -294,6 +348,6 @@ def tests():
     # print(observations)
     # alg_test(observations)
 
-# main()
-tests()
+main()
+#tests()
 
