@@ -21,41 +21,97 @@ class Hypothesis:
         self.cherry = cherry
         self.lime = lime
 
-
     def __str__(self):
         return "(cherry: " + str(round(self.cherry,2)) + ", lime: " + str(round(self.lime, 2)) + " --> " + str(round(self.prob,2)) + ")"
 
+
 # uses global combinationsDict object to make calculations faster
 def binomial(cherries, limes, percent_cherry, percent_lime):
-    percent = combinations_dict[str(cherries)] * (percent_cherry**cherries) * (percent_lime)**(limes)
+    percent = combinations_dict[str(cherries)] * float(percent_cherry**cherries) * float(percent_lime**limes)
     # print(percent)
     return percent
 
 
-# TODO: this might be wrong 
+# https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
 def update_priors(observations, sample_size, initial_priors):
+    num_cherry = observations[0]
+    num_lime = observations[1]
+    assert(num_cherry + num_lime == sample_size)
+    priors = copy.deepcopy(initial_priors)
+
+    for l in range(0, num_lime):
+        denom = 0
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Li = Hi.lime
+            P_Hi = Hi.prob
+            P_D = P_Li * P_Hi
+            denom += P_D
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Li = Hi.lime
+            P_Hi = Hi.prob
+            num = P_Li * P_Hi
+            priors[j].prob = num/denom
+        print(priors[2])
+
+    for c in range(0, num_cherry):
+        denom = 0
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Ci = Hi.cherry
+            P_Hi = Hi.prob
+            P_D = P_Ci * P_Hi
+            denom += P_D
+        for j in range(0, len(priors)):
+            Hi = priors[j]
+            P_Ci = Hi.cherry
+            P_Hi = Hi.prob
+            num = P_Ci * P_Hi
+            priors[j].prob = num/denom
+        print(priors[2])
+
+    # for l in range(0, num_lime):
+    #     denom = 0
+    #     for j in range(0, len(priors)):
+    #         Hi = priors[j]
+    #         P_Li = Hi.lime
+    #         P_Hi = Hi.prob
+    #         P_D = P_Li * P_Hi
+    #         denom += P_D
+    #     for j in range(0, len(priors)):
+    #         Hi = priors[j]
+    #         P_Li = Hi.lime
+    #         P_Hi = Hi.prob
+    #         num = P_Li * P_Hi
+    #         priors[j].prob = num/denom
+
+    return priors
+
+
+
+# this is wrong because it is updating all cherry and then all lime.
+def old_update_priors(observations, sample_size, initial_priors):
     num_cherry = observations[0] 
     num_lime = observations[1] 
     assert(num_cherry + num_lime == sample_size)
-
     priors = copy.deepcopy(initial_priors)
+
     for c in range(0, num_cherry):
         priors_unscaled = []
         for j in range(0, len(priors)):
             Hi = priors[j]
             P_Ci = Hi.cherry
-            P_Li = Hi.lime
             P_Hi = Hi.prob
             priors_unscaled += [P_Ci * P_Hi]
         s = sum(priors_unscaled)
         for j in range(0, len(priors)):
             priors[j].prob = priors_unscaled[j] / s
 
-    for i in range(0, num_lime):
+    for l in range(0, num_lime):
         priors_unscaled = []
         for j in range(0, len(priors)):
             Hi = priors[j]
-            P_Ci = Hi.cherry
             P_Li = Hi.lime
             P_Hi = Hi.prob
             priors_unscaled += [P_Li * P_Hi]
@@ -85,7 +141,7 @@ def make_combinations_dict(sampleSize):
 def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
     priors = update_priors(observations, sample_size, initial_priors)
 
-    if r == R: # base case
+    if r == R:  # base case
         M_C = 0
         M_L = 0
         for h in priors:
@@ -104,10 +160,13 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
         else: this_vote = "abstain" 
         return this_vote
     else:
-        cherry_revenue = lime_revenue = 0
-        cherry_cost = lime_cost = 0
+        cherry_revenue = 0
+        lime_revenue = 0
+        cherry_cost = 0
+        lime_cost = 0
         for h in priors:
-            cherry_sum = lime_sum = 0
+            cherry_sum = 0
+            lime_sum = 0
             P_Hi = h.prob
             P_Ci = h.cherry
             P_Li = h.lime
@@ -126,10 +185,12 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
             elif lime_sum > cherry_sum:
                 lime_revenue += P_Hi * (cherry_sum/lime_sum)
                 cherry_cost += P_Hi
+            print(h, end="")
+            print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost)
         cherry_profit = cherry_revenue - cherry_cost
         lime_profit = lime_revenue - lime_cost
-        if r == 0:
-            print("cherry_profit", cherry_profit, "lime_profit", lime_profit)
+        # if r == 0:
+        #     print("cherry_profit", cherry_profit, "lime_profit", lime_profit)
         if cherry_profit > lime_profit and cherry_profit > 0: this_vote = "cherry"
         elif lime_profit > cherry_profit and lime_profit > 0: this_vote = "lime"
         else: this_vote = "abstain"
@@ -154,6 +215,10 @@ def experimentHeaderPrint(observations, sample_size, initial_priors, R):
         print(prior)
     print("my observations: cherries:", observations[0], "limes:", observations[1])
     #print("decision weight:", decisionWeight)
+
+
+def print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost):
+    print("cherry_rev", cherry_revenue, "cherry_cost", cherry_cost, "lime_rev", lime_revenue, "lime_cost", lime_cost)
 
 
 def main():
@@ -181,5 +246,54 @@ def main():
         print(vote)
         print()
 
-main()
+
+def prior_update_test(observations):
+    print(observations)
+    sample_size = 10
+    priors_probs = [1/5 for i in range(0, 5)]
+    priors_cherry_probs = [0, .25, .5, .75, 1]
+    initial_priors = make_hypothesis_list(priors_probs, priors_cherry_probs)
+    new_priors = update_priors(observations, sample_size, initial_priors)
+    # new_priors2 = old_update_priors(observations, sample_size, initial_priors)
+
+    print("new algo")
+    for p in new_priors:
+        print(p)
+    # print("old algo")
+    # for p in new_priors2:
+    #     print(p)
+
+
+def alg_test(observations):
+    global combinations_dict
+    R = 1
+    sample_size = 10
+    combinations_dict = make_combinations_dict(sample_size)
+    priors_probs = [1/5 for i in range(0, 5)]
+    priors_cherry_probs = [0, .25, .5, .75, 1]
+    initial_priors = make_hypothesis_list(priors_probs, priors_cherry_probs)
+    # experimentHeaderPrint(observations, sample_size, initial_priors, R)
+    vote = imperfect_info_algo(observations, sample_size, initial_priors, R)
+    print(vote)
+
+
+
+def tests():
+    # seventhree = (7,3)
+    # threeseven = (3,7)
+    fivefive = (5,5)
+    # prior_update_test(seventhree)
+    # prior_update_test(threeseven)
+    prior_update_test(fivefive)
+
+    # observations = (4,6)
+    # print(observations)
+    # alg_test(observations)
+    # print()
+    # observations = (6,4)
+    # print(observations)
+    # alg_test(observations)
+
+# main()
+tests()
 
