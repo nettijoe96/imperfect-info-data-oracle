@@ -31,6 +31,35 @@ def binomial(cherries, limes, percent_cherry, percent_lime):
     # print(percent)
     return percent
 
+
+
+# https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
+def update_priors_batch(observations, sample_size, initial_priors):
+    num_cherry = observations[0]
+    num_lime = observations[1]
+    assert(num_cherry + num_lime == sample_size)
+    priors = copy.deepcopy(initial_priors)
+
+    denom = 0
+    nums = []
+    for i in range(0, len(priors)):
+        Hi = priors[i]
+        P_Ci = Hi.cherry
+        P_Li = Hi.lime
+        P_D = binomial(num_cherry, num_lime, P_Ci, P_Li) * Hi.prob
+        nums += [P_D]
+        denom += P_D
+    for i in range(0, len(priors)):
+        num = nums[i]
+        priors[i].prob = num/denom
+
+    for p in priors:
+        p.prob = round(p.prob, round_decimal_place)
+
+    return priors
+
+
+
 # https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
 def update_priors_reverse(observations, sample_size, initial_priors):
     num_cherry = observations[0]
@@ -69,7 +98,7 @@ def update_priors_reverse(observations, sample_size, initial_priors):
             num = P_Li * P_Hi
             priors[j].prob = num/denom
         #print(priors[2])
-        
+
     for p in priors:
         p.prob = round(p.prob, round_decimal_place)
 
@@ -186,13 +215,14 @@ def print_priors(priors):
 def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
     priors1 = update_priors(observations, sample_size, initial_priors)
     priors2 = update_priors_reverse(observations, sample_size, initial_priors)
+    priors3 = update_priors_batch(observations, sample_size, initial_priors)
     if not compare_priors(priors1, priors2):
         print("priors1")
         print_priors(priors1)
         print("priors2")
         print_priors(priors2)
         raise Exception("diff priors")
-    priors = priors1
+    priors = priors3
 
     if r == R:  # base case
         M_C = 0
@@ -217,7 +247,8 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
         lime_revenue = 0
         cherry_cost = 0
         lime_cost = 0
-        for h in priors:
+        for i in range(len(priors)):
+            h = priors[i]
             cherry_sum = 0
             lime_sum = 0
             P_Hi = h.prob
@@ -232,14 +263,20 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
                 if next_vote == "cherry": cherry_sum += normalized_binomial_prob
                 elif next_vote == "lime": lime_sum += normalized_binomial_prob
                 elif next_vote == "abstain": pass
+            cherry_sum = round(cherry_sum, round_decimal_place)
+            lime_sum = round(lime_sum, round_decimal_place)
             if cherry_sum > lime_sum:
-                cherry_revenue += P_Hi * (lime_sum/cherry_sum)
+                delta_rev = P_Hi * (lime_sum/cherry_sum)
+                print("adding to cherry rev", delta_rev, "prior", i)
+                cherry_revenue += delta_rev
                 lime_cost += P_Hi
             elif lime_sum > cherry_sum:
-                lime_revenue += P_Hi * (cherry_sum/lime_sum)
+                delta_rev = P_Hi * (cherry_sum/lime_sum)
+                print("adding to lime rev", delta_rev, "prior", i)
+                lime_revenue += delta_rev
                 cherry_cost += P_Hi
             #print(h, end="")
-            #print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost)
+        # print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost)
         cherry_profit = cherry_revenue - cherry_cost
         lime_profit = lime_revenue - lime_cost
         # if r == 0:
@@ -334,19 +371,19 @@ def alg_test(observations):
 def tests():
     seventhree = (7,3)
     #threeseven = (3,7)
-    fivefive = (5,5)
-    sixfour = (6,4)
-    prior_update_test(fivefive)
+    # fivefive = (5,5)
+    # sixfour = (6,4)
+    # prior_update_test(fivefive)
     #prior_update_test(threeseven)
     #prior_update_test(fivefive)
 
-    # observations = (4,6)
-    # print(observations)
-    # alg_test(observations)
-    # print()
-    # observations = (6,4)
-    # print(observations)
-    # alg_test(observations)
+    observations = (3,7)
+    print(observations)
+    alg_test(observations)
+    print()
+    observations = (7,3)
+    print(observations)
+    alg_test(observations)
 
 main()
 #tests()
