@@ -13,6 +13,11 @@ ROUND_DECIMAL_PLACE = 6
 
 
 class Hypothesis:
+    """
+    A hypothesis of the distribution of candies in the bag. 
+    There are two types of candies so cherry + lime probabilities must equal 1
+    The hypothesis has some prior probability of being correct
+    """
     
     def __init__(self, cherry, lime, prob):
         assert(cherry + lime == 1)
@@ -24,15 +29,29 @@ class Hypothesis:
         return "(cherry: " + str(round(self.cherry,2)) + ", lime: " + str(round(self.lime, 2)) + " --> " + str(round(self.prob,2)) + ")"
 
 
-# uses global combinationsDict object to make calculations faster
-def binomial(cherries, limes, percent_cherry, percent_lime):
-    percent = combinations_dict[str(cherries)] * float(percent_cherry**cherries) * float(percent_lime**limes)
-    # print(percent)
-    return percent
+def binomial(A_num, B_num, A_prob, B_prob):
+    """
+    binomial distribution formula
+    uses global combinations_dict object to make calculations faster
+    @param A_num: number of A obsevations
+    @param B_num: number of B observations
+    @param A_prob: probability of observing A
+    @param B_prob: probabliity of observing B
+    @return probability    
+    """
+    probability = combinations_dict[str(A_num)] * float(A_prob**A_num) * float(B_prob**B_num)
+    return probability
 
 
-# https://ocw.mit.edu/courses/mathematics/18-05-introduction-to-probability-and-statistics-spring-2014/readings/MIT18_05S14_Reading11.pdf
 def update_priors_batch(observations, sample_size, initial_priors):
+    """
+    updates priors with observations
+    assertion: sum of observations tuple must be the sample_size.
+    @param observations: tuple of observations (#cherry, #lime)
+    @param sample_size
+    @param initial_priors: list of hypothesis objects whose probs must add to 1
+    @return posteriers
+    """
     num_cherry = observations[0]
     num_lime = observations[1]
     assert(num_cherry + num_lime == sample_size)
@@ -58,16 +77,28 @@ def update_priors_batch(observations, sample_size, initial_priors):
 
 
 def ncr(n, r):
+    """
+    number of combinations function
+    n choose r
+    @param n
+    @param r
+    @param # of combinations
+    """
     r = min(r, n-r)
     numer = reduce(op.mul, range(n, n-r, -1), 1)
     denom = reduce(op.mul, range(1, r+1), 1)
     return numer / denom
 
 
-def make_combinations_dict(sampleSize):
+def make_combinations_dict(sample_size):
+    """
+    for speeding up computation, we create a dict mapping r (in n choose r) to number of combinations
+    @param sample_size
+    @return combination dict
+    """
     comb_dict = {}
-    for cherries in range(0, sampleSize+1):
-        comb = ncr(sampleSize, cherries)
+    for cherries in range(0, sample_size+1):
+        comb = ncr(sample_size, cherries)
         comb_dict[str(cherries)] = comb
     return comb_dict
 
@@ -82,11 +113,26 @@ def compare_priors(priors1, priors2):
 
 
 def print_priors(priors):
+    """
+    print the priors
+    @param priors
+    """
     for p in priors:
         print(p)
 
 
-def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
+def imperfect_info_decision_algo(observations, sample_size, initial_priors, R, r=0):
+    """
+    The most important function of this repository
+    It is the imperfect information decision algorithm
+    See paper for explanation of the algorithm.
+    @param observations: tuple of observations (#cherry, #lime)
+    @param sample_size
+    @param initial_priors: list of hypothesis objects whose probs must add to 1
+    @param R: number of recursive rounds
+    @param r: current recursive round
+    @return: vote
+    """
     priors = update_priors_batch(observations, sample_size, initial_priors)
 
     if r == R:  # base case
@@ -145,6 +191,11 @@ def imperfect_info_algo(observations, sample_size, initial_priors, R, r=0):
                 
 
 def make_hypothesis_list(priors_probs, priors_cherry_probs):
+    """
+    @param priors_probs: list of probabilities of a hypotheses being true
+    @param priors_cherry_prob: list of distribution of cherries
+    @return hypothesis list
+    """
     initial_priors = []
     for i in range(0, len(priors_probs)):
         P_Ci = priors_cherry_probs[i]
@@ -168,9 +219,14 @@ def print_revenue_cost(cherry_revenue, lime_revenue, cherry_cost, lime_cost):
 
 
 def main():
+    """
+    command line argument dictates number of recursive rounds
+    runs the decision algorithm for each observation set
+    prints the result for each observation set
+    """
     global combinations_dict 
     if len(sys.argv) == 1:
-        R = 3 # default recusive is 3
+        R = 2 # default recusive is 2
     else:
         R = int(sys.argv[1])
 
@@ -186,40 +242,11 @@ def main():
     #for cherries in range(0, (sample_size//2)+2):
     for cherries in range(0, sample_size+1):
         limes = sample_size - cherries
-        observations = (cherries,limes)
+        observations = (cherries, limes)
         experiment_header_print(observations, sample_size, initial_priors, R)
         vote = imperfect_info_decision_algo(observations, sample_size, initial_priors, R)
         print(vote)
         print()
-
-
-def prior_update_test(observations):
-    print(observations)
-    sample_size = 10
-    priors_probs = [1/5 for i in range(0, 5)]
-    priors_cherry_probs = [0, .25, .5, .75, 1]
-    initial_priors = make_hypothesis_list(priors_probs, priors_cherry_probs)
-    new_priors = update_priors(observations, sample_size, initial_priors)
-    reverse_priors = update_priors_reverse(observations, sample_size, initial_priors)
-
-    print("algo")
-    for p in new_priors:
-        print(p)
-    print("algo reverse")
-    for p in reverse_priors:
-        print(p)
-
-
-def alg_test(observations):
-    global combinations_dict
-    R = 1
-    sample_size = 10
-    combinations_dict = make_combinations_dict(sample_size)
-    priors_probs = [1/5 for i in range(0, 5)]
-    priors_cherry_probs = [0, .25, .5, .75, 1]
-    initial_priors = make_hypothesis_list(priors_probs, priors_cherry_probs)
-    vote = imperfect_info_decision_algo(observations, sample_size, initial_priors, R)
-    print(vote)
 
 main()
 
